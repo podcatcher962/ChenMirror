@@ -110,6 +110,18 @@ html[data-theme="dark"] .btn.primary{background:linear-gradient(180deg,#4a69bd,#
 .days{display:flex;justify-content:center;gap:10px;margin-top:16px;flex-wrap:wrap}
 .day-chip{width:44px;height:44px;border:1px solid var(--mutedBdr);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--dim)}
 .day-chip.on{border-color:#639922;color:#639922;background:rgba(99,153,34,0.12)}
+.day-chip.mile{border-color:var(--gold);color:var(--gold);border-width:2px;font-weight:bold}
+.daynote{font-size:11px;color:var(--dim);margin-top:8px;letter-spacing:1px}
+/* Modal */
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);z-index:200;justify-content:center;align-items:center;padding:20px}
+.modal-overlay.show{display:flex}
+.modal-box{background:var(--card);border:3px solid var(--bdr);max-width:640px;width:100%;max-height:82vh;overflow-y:auto;padding:26px 28px;position:relative;box-shadow:var(--shadow)}
+.modal-box h2{color:var(--gold);font-size:17px;letter-spacing:3px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--bdr)}
+.modal-box h3{color:var(--accent);font-size:13px;letter-spacing:1px;margin:14px 0 4px}
+.modal-box p,.modal-box li{font-size:12px;color:var(--text);line-height:1.9;margin:6px 0}
+.modal-box ul{padding-left:18px}
+.modal-close{position:absolute;top:12px;right:16px;color:var(--dim);font-size:20px;cursor:pointer;background:none;border:none;font-family:inherit}
+.modal-close:hover{color:var(--gold)}
 /* Footer */
 .foot{margin-top:44px;text-align:center;color:var(--dim);font-size:11px;line-height:2;letter-spacing:1px}
 .foot a{color:var(--accent);text-decoration:none}
@@ -139,6 +151,8 @@ html[data-theme="dark"] .btn.primary{background:linear-gradient(180deg,#4a69bd,#
   <a id="btnTheme" onclick="toggleTheme()" title="主题">🌙</a>
   <a id="btnSound" onclick="toggleSound()">♪ <span id="tSound">音乐</span></a>
   <a id="btnHow" onclick="go('how')">❓ <span id="tHow">说明</span></a>
+  <a id="btnAbout" onclick="openModal('about')">ℹ️ <span id="tAbout">关于</span></a>
+  <a id="btnDisc" onclick="openModal('disclaim')">⚠️ <span id="tDisc">免责声明</span></a>
   <a id="btnHome" onclick="go('home')">🏮 <span id="tHome">镜门</span></a>
   <a id="btnResult" onclick="go('result')">🧭 <span id="tResult">名士</span></a>
 </div>
@@ -163,6 +177,10 @@ html[data-theme="dark"] .btn.primary{background:linear-gradient(180deg,#4a69bd,#
   <div class="tagline">单文件 HTML · 无追踪 · 免费开源 · 数据仅存本机</div>
   <div id="busuanzi_container_site_pv" style="margin-top:8px;color:var(--accent)">👁 总浏览 <span id="busuanzi_value_site_pv"></span> 次</div>
 </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box" id="modalBox"></div>
 </div>
 
 <script>
@@ -1021,8 +1039,14 @@ function load(){
 }
 const I18N = {
   zh:{done:"已照之镜", title:"名士称号", day:"日课天数", sound:"音乐", how:"说明", home:"镜门", result:"名士",
+      about:"关于", disclaim:"免责声明", gates:"三十六门 · 三十六镜", daily:"名士日课 · 每日诵一言，攒 7/21/81 天",
+      check:"今日诵此一言", again:"今日已诵，再诵一遍", back:"← 镜门", back2:"← 镜门", back3:"← 名士像",
+      card:"绘我名士名片", copy:"复制结语", save:"保存名片", more:"继续照镜",
       slogan:"以《世说新语》三十六门为镜 · 照见名利场中的你 · 不判对错，只照见本心"},
   en:{done:"Mirrors", title:"Title", day:"Days", sound:"Music", how:"Help", home:"Mirrors", result:"Persona",
+      about:"About", disclaim:"Disclaimer", gates:"36 Gates · 36 Mirrors", daily:"Daily Line · read once a day, build a 7/21/81-day streak",
+      check:"Read today's line", again:"Already read — read it again", back:"← Gates", back2:"← Gates", back3:"← Persona",
+      card:"Draw my persona card", copy:"Copy result", save:"Save card", more:"Keep mirroring",
       slogan:"36 gates of Shishuo Xinyu as mirrors — see the you inside the arena"},
 };
 function t(k){ return (I18N[lang]||I18N.zh)[k]; }
@@ -1033,6 +1057,8 @@ function setL(l){
   document.getElementById('slogan').textContent = t('slogan');
   document.getElementById('tSound').textContent = t('sound');
   document.getElementById('tHow').textContent = t('how');
+  document.getElementById('tAbout').textContent = t('about');
+  document.getElementById('tDisc').textContent = t('disclaim');
   document.getElementById('tHome').textContent = t('home');
   document.getElementById('tResult').textContent = t('result');
   document.querySelectorAll('[data-l]').forEach(el=>{ el.textContent = t(el.getAttribute('data-l')); });
@@ -1109,13 +1135,15 @@ function render(){
   h += `<div class="sec-h"><span class="bar"></span><h2>📜 <span data-l="daily">名士日课</span></h2><span class="bar"></span></div>`;
   const w = DAYWORDS[new Date().getDate() % DAYWORDS.length];
   h += `<div class="dayword"><div class="w">「${w[0]}」</div><div class="ws">—— ${w[1]}</div>`;
+  h += `<div class="daynote" data-l="daily"></div>`;
   h += `<div class="days">`;
   const checked = Math.min(S.dayCount, 81);
   for(let i=1;i<=81;i++){
-    h += `<div class="day-chip${i<=checked?' on':''}" title="${i}天">${i<=checked?'✓':i}</div>`;
+    const isMile = i===7||i===21||i===81;
+    h += `<div class="day-chip${i<=checked?' on':''}${isMile?' mile':''}" title="${i}天">${i<=checked?'✓':(isMile?i:'')}</div>`;
   }
   h += `</div>`;
-  h += `<button class="btn primary" onclick="checkDay()">${S.dayCount>0?'<span data-l="again">今日已读，再诵一遍</span>':'<span data-l="check">今日诵此一言</span>'}</button></div>`;
+  h += `<button class="btn primary" onclick="checkDay()">${S.dayCount>0?t('again'):t('check')}</button></div>`;
   V.innerHTML = h;
   bindL();
   // 滚动提示
@@ -1382,6 +1410,50 @@ function renderHow(){
   window.scrollTo({top:0});
 }
 function bindL(){ document.querySelectorAll('[data-l]').forEach(el=>{ el.textContent = t(el.getAttribute('data-l')); }); }
+
+/* ============ 关于 / 免责声明 ============ */
+function openModal(type){
+  const U = lang==='en';
+  const close = '<button class="modal-close" onclick="closeModal()">✕</button>';
+  const box = document.getElementById('modalBox');
+  if(type==='about'){
+    box.innerHTML = close + (U?`
+      <h2>ℹ️ About</h2>
+      <p><b>Chenhuai · Shishuo Mirror Records</b> (ChenMirror) — the second volume of the Mirror Records series (after JianMirror). It uses the 36 gates of <i>Shishuo Xinyu</i> as mirrors to reflect the you inside the arena. No right or wrong — only reflection.</p>
+      <h3>Author</h3>
+      <p>Lanlan Eternal (永远的兰兰)</p>
+      <h3>Tech</h3>
+      <p>Single-file HTML. No backend, no tracking, no data upload — everything stays in your browser. Classical texts from <i>Shishuo Xinyu</i> (compiled by Liu Yiqing, Southern Dynasties).</p>
+    `:`
+      <h2>ℹ️ 关于</h2>
+      <p><b>澄怀 · 世说镜鉴录</b>（ChenMirror）——镜鉴系列第二部（继见素之后）。以《世说新语》三十六门为镜，照见名利场中的你。不判对错，只照见本心。</p>
+      <h3>作者</h3>
+      <p>永远的兰兰（Lanlan Eternal）</p>
+      <h3>技术说明</h3>
+      <p>单文件 HTML，无后端、无追踪、无数据上传，所有数据仅存本机浏览器。文言原文出自《世说新语》（南朝宋 · 刘义庆编撰）。</p>
+    `);
+  } else {
+    box.innerHTML = close + (U?`
+      <h2>⚠️ Disclaimer</h2>
+      <p><b>1. Nature:</b> For personal study and entertainment only; not a commercial service and not professional advice.</p>
+      <p><b>2. Content:</b> Classical texts adapted from <i>Shishuo Xinyu</i> (compiled by Liu Yiqing); translations and reflections are personal interpretations for reference.</p>
+      <p><b>3. Mirroring:</b> This is a mirror for self-reflection — no real divination or fortune-telling is implied, and no decision-making advice is given.</p>
+      <p><b>4. Privacy:</b> Pure front-end single file. No server, no tracking, no upload; all progress stays in your browser.</p>
+      <p><b>5. Warranty:</b> Provided "as is" without warranty. By using this app you accept all terms above.</p>
+    `:`
+      <h2>⚠️ 免责声明</h2>
+      <p><b>1. 性质说明</b><br>本工具为个人学习与娱乐用途，非商业服务，不构成任何专业建议。</p>
+      <p><b>2. 内容来源</b><br>文言原文出自《世说新语》（南朝宋 · 刘义庆编撰），白话与判词为个人整理与解读，仅供参考。</p>
+      <p><b>3. 镜鉴性质</b><br>本工具为自我照见之镜，不涉及真实占卜、命理预测，不构成任何决策依据。</p>
+      <p><b>4. 数据隐私</b><br>纯前端单文件，无服务器、无追踪、无数据上传；所有进度仅存本机浏览器。</p>
+      <p><b>5. 免责</b><br>软件按"现状"提供，作者不作任何明示或暗示担保。使用即视为已阅读并同意以上条款。</p>
+    `);
+  }
+  document.getElementById('modalOverlay').classList.add('show');
+}
+function closeModal(){
+  document.getElementById('modalOverlay').classList.remove('show');
+}
 
 /* ============ 初始化 ============ */
 load();
